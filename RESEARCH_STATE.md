@@ -68,6 +68,16 @@ All parallel, resumable (skips existing), retry w/ backoff.
   - Continuous corr(windowed CVD, forward return) = +0.003 IS / -0.006 OOS = essentially ZERO both samples.
 - ROOT CAUSE: kline taker volume = aggressor side, which is contemporaneously ~equal to the price move itself, so CVD carries almost no info beyond price. Real order-flow edge needs order book (resting liquidity/absorption) or actual liquidation prints — NOT available from OHLCV+taker. CONFIRMS meta-conclusion.
 
+
+### H7 — funding carry (delta-neutral: long spot + short perp) [WORKS, modest]
+- First strategy that actually makes money delta-neutral (not a prediction game -> dodges the cost wall). Backtest (spot+perp+funding, all on disk):
+  - Passive: +7.6%/yr, Sharpe 0.33, maxDD -8.9% (2023-26). Carry return ~= raw funding (+7.3%/yr) as expected.
+  - BUT yield is SHRINKING: 2024 +11.9% -> 2025 +5.1% -> 2026 +1.1%/yr. Backward-looking 7% overstates forward.
+  - Not riskless: funding negative 14% of periods (carry bleeds ~-20%/yr those), residual basis/tracking noise ~70bp/8h -> the -9% DD.
+  - Active flip-on-negative-funding does NOT reliably help (OOS +1.2%, basis noise+fees eat it).
+- To juice to 20-40%: leverage (x3-5 scales DD to -27/-45% + liquidation risk) and/or high-funding alts (blowup risk). Unleveraged BTC carry = low-risk bond-like ~1-5% now.
+- Spot klines note: Binance vision klines switched to MICROSECOND timestamps ~2025 (2025+ files); must auto-detect unit (>1e14 -> //1000) or dates break.
+
 ### Meta-learning (STRONG — confirmed across 6 hypotheses)
 At 1-minute+ resolution with Binance perp costs (~9bp taker RT), essentially every simple price/derivatives statistical structure we found is one of: (a) below cost per event (fade, funding), (b) turnover-killed (H2 regime, H4 OI), (c) just market beta (H1 momentum in bull), or (d) already arbitraged (H5 lead-lag). The ONLY thing with genuine, cost-robust value is trend-following as a DRAWDOWN-CONTROL overlay (not alpha). Honest implication: a durable retail edge at this frequency likely needs richer data we don't have (full order book, per-event liquidations) or infrastructure (sub-minute/colocation) out of reach for a solo dev — OR a shift to lower-frequency / bigger-target strategies where cost is a small fraction (none found yet), or discretionary approaches.
 
@@ -85,7 +95,8 @@ At 1-minute+ resolution with Binance perp costs (~9bp taker RT), essentially eve
 - [x] H3 funding-extreme contrarian — FAIL after cost (non-stationary)
 - [x] H4 OI + price quadrant — FAIL (no separation, turnover)
 - [x] H5 cross-asset lead-lag (liquid+mid) — FAIL (arbitraged at 1m)
-- [x] H6 order-flow/CVD — FAIL (CVD~price, zero forward corr; needs order book/liquidations)
+- [x] H6 order-flow/CVD — FAIL (CVD~price, zero forward corr)
+- [x] H7 funding carry — WORKS delta-neutral (+7.6%/yr, DD -9%) but modest & yield shrinking; juice=leverage/alts=risk
 
 ### Where to go next (all naive 1m price/deriv hypotheses exhausted)
 - If continuing: (a) lower-frequency / bigger-target setups where 9bp is a small fraction (unexplored, but no edge found yet); (b) sub-minute/tick data for lead-lag & microstructure (infra-heavy); (c) full order-book / detailed liquidation data (not on vision); (d) accept trend-following risk-overlay as the one real result and stop mining 1m alpha.
