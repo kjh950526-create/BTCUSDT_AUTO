@@ -1,7 +1,7 @@
 # BTCUSDT_AUTO — Research State
 
 > Continuity doc for cross-session work. Read this first. Update after each session.
-> Last updated: 2026-07-09
+> Last updated: 2026-07-09 (session 2: crash re-test + H3-H5)
 
 ## 0. Project goal
 Build a rigorously-validated automated trading strategy for Binance USDM perpetual futures.
@@ -43,21 +43,25 @@ All parallel, resumable (skips existing), retry w/ backoff.
 
 ### H1 — daily time-series momentum
 - FAILED in-sample. Loses to buy&hold on return/Sharpe/drawdown (B&H Sharpe 1.78 vs best mom 1.53). Long/short bleeds (short side in a bull). VR>1 at daily was only mild (1.03-1.07); pure drift-neutral momentum spread is noisy/unstable across lookbacks.
-- CAVEAT: IS 2023-24 is a one-way bull with no sustained crash, so it CANNOT fairly test trend-following's real value = crash defense. -> re-test needs crash data (see Open Threads).
+- CAVEAT resolved: CRASH RE-TEST on 2021-2022 (incl -77% bear, data pulled from vision) DONE. Trend-following long/flat HALVES drawdown (SMA100 maxDD -38% vs buy&hold -77%; SMA30 -50%) but doesn't profit long/flat (just loses less). Long/short can profit in bear (SMA30 +33%) but parameter-fragile -> don't trust the number, direction only.
+- FINAL H1 verdict: trend-following is NOT standalone alpha; it's a DRAWDOWN-CONTROL / regime overlay — gives up bull upside to roughly halve bear drawdown (classic trend profile). Use as risk overlay, not as the edge.
 
 ### H2 — volatility-regime switch (trend vs revert)
 - Core structural fact CONFIRMED and strong: regime-conditional lag-1 autocorrelation flips sign. LOW-vol regime = positive autocorr (TREND), HIGH-vol regime = negative autocorr (REVERT). Spread -0.20 (4h), -0.27 (1d). Mechanistically coherent: quiet grind trends; violent liquidation spikes overshoot & snap back. UNIFIES Phase 1 (spikes=high-vol=reversion).
 - Explains H1 failure: unconditional momentum mixes trending low-vol with reverting high-vol -> washes out.
 - BUT as a strategy: edge lives in lag-1 -> requires flipping ~every bar -> max turnover -> dies to cost (daily 0bp Sharpe 1.34 -> 9bp Sharpe 0.64, < B&H). Smoothing to cut turnover DESTROYS the edge (0bp Sharpe -> 0.30). FAIL as naive tradeable; signal is real.
 
-### Meta-learning
-Price-only short-horizon structure on BTC perp is REAL but broadly cost-constrained: big effects are bull-beta or turnover-heavy; clean effects are < 9 bp/event. This motivated moving to non-price (derivatives) data.
+### H3 — funding-extreme contrarian (derivatives)
+- Relationship REAL and (unlike IS) clean in OOS: high funding (crowded longs) -> -170 bp/3d in 2025-26. But IS bull makes high-funding still +ve -> can't build a validated short rule from IS. Absolute-threshold strategy: IS +12%/Sh0.35, OOS -18%/Sh-0.42 (FAILS; funding level is non-stationary, IS threshold doesn't transfer). Adaptive funding z-score version ALSO negative IS+OOS after 9bp cost. FAIL as tradeable. Only robust half: negative funding -> higher fwd return (IS +129, OOS +36, both +ve) — a weak long-only sliver.
 
-### Funding teaser (in-sample, rough)
-- Negative funding (crowded shorts) -> higher 3d forward return (+162 bp Q1). High funding still positive fwd (bull drift). Suggestive contrarian-on-funding signal; NOT yet properly tested. qcut collapsed to 4 buckets (mass at default 0.01%).
+### H4 — OI-surge + price quadrant (derivatives)
+- (price up/down x OI up/down) quadrants do NOT separate forward returns: IS all +ve (bull drift), OOS all -ve (drift), no differentiation by quadrant. Mechanistic "OI confirms trend" story does not show up at 1h. Hourly strategy dies to turnover (-100%). FAIL.
 
-### Cross-asset lead-lag teaser (in-sample)
-- Liquid alts strongly co-move contemporaneously (ETH 0.83, others 0.54-0.68) but forward return AFTER a big BTC 5m move is ~0 or slightly negative for all 6. -> 1-5m BTC->alt lag is ALREADY ARBITRAGED for liquid names. Naive "follow BTC" FAILS here. Would need mid-cap alts or sub-minute data.
+### H5 — cross-asset BTC->alt lead-lag
+- Liquid alts (ETH/SOL/XRP/DOGE/BNB/ADA) AND mid-caps (LINK/AVAX/DOT/LTC/ATOM/UNI/FIL/NEAR): strong contemporaneous co-move (corr 0.54-0.83, co-move +80-100bp same 5m bar) but forward return AFTER big BTC move ~0 at 1-3m and NEGATIVE at 5-10m for ALL. -> BTC->alt lag is already arbitraged at 1-minute for the entire liquid+mid universe. Would need sub-minute/tick data. FAIL.
+
+### Meta-learning (STRONG — confirmed across 6 hypotheses)
+At 1-minute+ resolution with Binance perp costs (~9bp taker RT), essentially every simple price/derivatives statistical structure we found is one of: (a) below cost per event (fade, funding), (b) turnover-killed (H2 regime, H4 OI), (c) just market beta (H1 momentum in bull), or (d) already arbitraged (H5 lead-lag). The ONLY thing with genuine, cost-robust value is trend-following as a DRAWDOWN-CONTROL overlay (not alpha). Honest implication: a durable retail edge at this frequency likely needs richer data we don't have (full order book, per-event liquidations) or infrastructure (sub-minute/colocation) out of reach for a solo dev — OR a shift to lower-frequency / bigger-target strategies where cost is a small fraction (none found yet), or discretionary approaches.
 
 ## 4. OPEN THREADS / NEXT STEPS
 1. **Funding/OI hypotheses (highest priority — data now in hand).** Properly test: funding-extreme contrarian; OI-surge + price (OI up + price up = new money trend vs OI down = short cover); funding carry / basis. Use IS/OOS discipline. This is the real payoff of the derivatives data.
@@ -65,11 +69,15 @@ Price-only short-horizon structure on BTC perp is REAL but broadly cost-constrai
 3. **Cross-asset, take 2.** Mid-cap alts (slower, bigger lag) and/or conditional on very large BTC moves only; beware survivorship & slippage. Liquid-alt version is dead.
 4. Execution note: live fapi is geo-blocked here; the live bot must run on OWNER's server with own API keys. LLM = research/backtest/codegen only, NOT the runtime loop (latency).
 
-## 5. HYPOTHESIS QUEUE (in order)
+## 5. HYPOTHESIS QUEUE
 - [x] Phase 0 terrain
-- [x] Phase 1 fade (+vol, +taker conditioning)
-- [x] H1 daily momentum (failed IS; crash re-test pending data)
-- [x] H2 vol-regime switch (signal real, naive impl fails cost)
-- [ ] H3 funding-extreme contrarian  <-- NEXT
-- [ ] H4 OI-surge + price direction
-- [ ] H5 cross-asset mid-cap lead-lag (pending data)
+- [x] Phase 1 fade (+vol, +taker conditioning) — FAIL (< cost)
+- [x] H1 daily momentum — FAIL as alpha; WIN as drawdown overlay (crash-tested 2021-22)
+- [x] H2 vol-regime switch — signal real, FAIL as tradeable (turnover)
+- [x] H3 funding-extreme contrarian — FAIL after cost (non-stationary)
+- [x] H4 OI + price quadrant — FAIL (no separation, turnover)
+- [x] H5 cross-asset lead-lag (liquid+mid) — FAIL (arbitraged at 1m)
+
+### Where to go next (all naive 1m price/deriv hypotheses exhausted)
+- If continuing: (a) lower-frequency / bigger-target setups where 9bp is a small fraction (unexplored, but no edge found yet); (b) sub-minute/tick data for lead-lag & microstructure (infra-heavy); (c) full order-book / detailed liquidation data (not on vision); (d) accept trend-following risk-overlay as the one real result and stop mining 1m alpha.
+- Available but unused data already downloaded: BTC metrics top/global long-short ratios (only OI + taker tested so far); alt funding/metrics (not downloaded); 2021-2022 metrics/funding (downloaded, only klines used).
