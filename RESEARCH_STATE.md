@@ -60,6 +60,14 @@ All parallel, resumable (skips existing), retry w/ backoff.
 ### H5 — cross-asset BTC->alt lead-lag
 - Liquid alts (ETH/SOL/XRP/DOGE/BNB/ADA) AND mid-caps (LINK/AVAX/DOT/LTC/ATOM/UNI/FIL/NEAR): strong contemporaneous co-move (corr 0.54-0.83, co-move +80-100bp same 5m bar) but forward return AFTER big BTC move ~0 at 1-3m and NEGATIVE at 5-10m for ALL. -> BTC->alt lag is already arbitraged at 1-minute for the entire liquid+mid universe. Would need sub-minute/tick data. FAIL.
 
+
+### H6 — order flow / CVD (from taker_buy_volume, the "new info" angle from a GPT feature list)
+- Built CVD = cumsum(2*taker_buy - volume). Three tests, all IS/OOS:
+  - Breakout CVD-confirmation vs divergence: IS confirmed-breakouts continue (+26 to +46bp spread) but OOS FLIPS sign (confirmed fade) -> regime/momentum-beta, not independent edge. FAIL.
+  - Absorption (strong aggression, no price progress -> reversal): wrong sign in IS (-5.2bp), ~0 in OOS. FAIL.
+  - Continuous corr(windowed CVD, forward return) = +0.003 IS / -0.006 OOS = essentially ZERO both samples.
+- ROOT CAUSE: kline taker volume = aggressor side, which is contemporaneously ~equal to the price move itself, so CVD carries almost no info beyond price. Real order-flow edge needs order book (resting liquidity/absorption) or actual liquidation prints — NOT available from OHLCV+taker. CONFIRMS meta-conclusion.
+
 ### Meta-learning (STRONG — confirmed across 6 hypotheses)
 At 1-minute+ resolution with Binance perp costs (~9bp taker RT), essentially every simple price/derivatives statistical structure we found is one of: (a) below cost per event (fade, funding), (b) turnover-killed (H2 regime, H4 OI), (c) just market beta (H1 momentum in bull), or (d) already arbitraged (H5 lead-lag). The ONLY thing with genuine, cost-robust value is trend-following as a DRAWDOWN-CONTROL overlay (not alpha). Honest implication: a durable retail edge at this frequency likely needs richer data we don't have (full order book, per-event liquidations) or infrastructure (sub-minute/colocation) out of reach for a solo dev — OR a shift to lower-frequency / bigger-target strategies where cost is a small fraction (none found yet), or discretionary approaches.
 
@@ -77,6 +85,7 @@ At 1-minute+ resolution with Binance perp costs (~9bp taker RT), essentially eve
 - [x] H3 funding-extreme contrarian — FAIL after cost (non-stationary)
 - [x] H4 OI + price quadrant — FAIL (no separation, turnover)
 - [x] H5 cross-asset lead-lag (liquid+mid) — FAIL (arbitraged at 1m)
+- [x] H6 order-flow/CVD — FAIL (CVD~price, zero forward corr; needs order book/liquidations)
 
 ### Where to go next (all naive 1m price/deriv hypotheses exhausted)
 - If continuing: (a) lower-frequency / bigger-target setups where 9bp is a small fraction (unexplored, but no edge found yet); (b) sub-minute/tick data for lead-lag & microstructure (infra-heavy); (c) full order-book / detailed liquidation data (not on vision); (d) accept trend-following risk-overlay as the one real result and stop mining 1m alpha.
